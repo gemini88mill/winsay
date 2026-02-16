@@ -141,14 +141,3 @@ export const run = async (
   return 0;
 };
 
-const main = async (): Promise<void> => {
-  const code = await run(process.argv.slice(2));
-  process.exit(code);
-};
-
-if (import.meta.main) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}

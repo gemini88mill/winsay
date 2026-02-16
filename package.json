@@ -4,13 +4,13 @@
   "type": "module",
   "private": true,
   "bin": {
-    "winsay": "./src/cli.ts"
+    "winsay": "./index.ts"
   },
   "scripts": {
-    "winsay": "bun run src/cli.ts",
-    "build": "bun build src/cli.ts --outdir=dist --target=bun",
+    "winsay": "bun run index.ts",
+    "build": "bun build index.ts --outdir=dist --target=bun",
     "test": "bun test",
-    "start": "bun run src/cli.ts"
+    "start": "bun run index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
