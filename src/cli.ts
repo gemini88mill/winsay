@@ -4,6 +4,7 @@
  */
 
 import path from "node:path";
+import { Command } from "commander";
 import { wrapText } from "./text";
 import { renderSpeechBubble, renderThoughtBubble } from "./bubble";
 import { getCow } from "./cow";
@@ -11,19 +12,6 @@ import { getCow } from "./cow";
 const DEFAULT_WRAP = 40;
 const MIN_WRAP = 5;
 const QUOTES_PATH = path.join(import.meta.dir, "..", "quotes.txt");
-
-const usage = (): string => `winsay - Windows-friendly cowsay
-
-Usage: winsay [options] [message]
-
-Options:
-  --wrap <n>   Wrap text to n columns (default: ${DEFAULT_WRAP}, minimum: ${MIN_WRAP})
-  --thought    Render thought bubble instead of speech bubble
-  -h, --help   Print this usage
-
-If no message is given, reads from stdin. If stdin is empty, picks a random quote from quotes.txt.
-Example: echo hi | winsay
-`;
 
 const getRandomQuote = async (
   quotesPath: string = QUOTES_PATH,
@@ -51,7 +39,6 @@ export const getMessage = async (
 
   const tty = isTTY ?? process.stdin?.isTTY ?? false;
   if (tty) {
-    // Interactive TTY: Bun.stdin.text() would block until EOF. Skip stdin and use quote.
     const getQuote = quoteProvider ?? (() => getRandomQuote());
     return await getQuote();
   }
@@ -69,36 +56,26 @@ type CliIo = {
   error: (line: string) => void;
 };
 
-const parseArgs = (argv: string[]): {
-  wrap: number;
-  thought: boolean;
-  help: boolean;
-  rest: string[];
-} => {
-  let wrap = DEFAULT_WRAP;
-  let thought = false;
-  let help = false;
-  const rest: string[] = [];
+const parseWrap = (value: string): number => {
+  const n = parseInt(value, 10);
+  if (Number.isNaN(n)) return DEFAULT_WRAP;
+  return Math.max(MIN_WRAP, n);
+};
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "-h" || arg === "--help") {
-      help = true;
-    } else if (arg === "--thought") {
-      thought = true;
-    } else if (arg === "--wrap") {
-      const next = argv[i + 1];
-      if (next !== undefined) {
-        const n = parseInt(next, 10);
-        wrap = Number.isNaN(n) ? DEFAULT_WRAP : Math.max(MIN_WRAP, n);
-        i++;
-      }
-    } else {
-      rest.push(arg);
-    }
-  }
-
-  return { wrap, thought, help, rest };
+const createProgram = (io: CliIo): Command => {
+  const program = new Command();
+  program
+    .name("winsay")
+    .description("Windows-friendly cowsay")
+    .option("--wrap <n>", `Wrap text to n columns (default: ${DEFAULT_WRAP}, minimum: ${MIN_WRAP})`, parseWrap, DEFAULT_WRAP)
+    .option("--thought", "Render thought bubble instead of speech bubble")
+    .argument("[message...]", "Message to display; if omitted, reads from stdin or picks a random quote");
+  program.configureOutput({
+    writeOut: (str) => io.log(str),
+    writeErr: (str) => io.error(str),
+  });
+  program.exitOverride();
+  return program;
 };
 
 export const run = async (
@@ -111,12 +88,18 @@ export const run = async (
   quoteProvider?: () => Promise<string>,
   isTTY?: boolean,
 ): Promise<number> => {
-  const { wrap, thought, help, rest } = parseArgs(argv);
-
-  if (help) {
-    io.log(usage());
-    return 0;
+  const program = createProgram(io);
+  try {
+    program.parse(argv, { from: "user" });
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "commander.helpDisplayed") {
+      return 0;
+    }
+    throw err;
   }
+
+  const opts = program.opts();
+  const rest = program.args;
 
   let message: string;
   try {
@@ -130,6 +113,8 @@ export const run = async (
     return 1;
   }
 
+  const wrap = opts.wrap as number;
+  const thought = opts.thought as boolean;
   const lines = wrapText(message, wrap);
   const bubble = thought ? renderThoughtBubble(lines) : renderSpeechBubble(lines);
   const cow = getCow();
@@ -140,4 +125,3 @@ export const run = async (
   io.log(cow);
   return 0;
 };
-

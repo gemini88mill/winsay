@@ -144,4 +144,29 @@ describe("cli", () => {
     expect(stdout).toContain("three");
     expect(stdout).toContain("four");
   });
+
+  test("--wrap minimum enforced", async () => {
+    const logs: string[] = [];
+    const code = await run(["--wrap", "3", "ab cd ef"], undefined, {
+      log: (line) => logs.push(line),
+      error: () => {},
+    });
+    const stdout = logs.join("\n");
+    expect(code).toBe(0);
+    // wrap 3 would break "ab cd" across lines; min 5 keeps "ab cd" on one line
+    expect(stdout).toContain("ab cd");
+  });
+
+  test("--thought renders thought bubble", async () => {
+    const logs: string[] = [];
+    const code = await run(["--thought", "think"], undefined, {
+      log: (line) => logs.push(line),
+      error: () => {},
+    });
+    const stdout = logs.join("\n");
+    expect(code).toBe(0);
+    expect(stdout).toContain("think");
+    expect(stdout).toContain("(");
+    expect(stdout).not.toContain("<");
+  });
 });
