@@ -1,0 +1,21 @@
+{
+  "name": "winsay",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "winsay": "./src/cli.ts"
+  },
+  "scripts": {
+    "winsay": "bun run src/cli.ts",
+    "build": "bun build src/cli.ts --outdir=dist --target=bun",
+    "test": "bun test",
+    "start": "bun run src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
