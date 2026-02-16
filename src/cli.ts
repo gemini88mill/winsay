@@ -56,6 +56,12 @@ type CliIo = {
   error: (line: string) => void;
 };
 
+const getErrorCode = (e: unknown): string | undefined => {
+  if (e === null || typeof e !== "object" || !("code" in e)) return undefined;
+  const v = (e as Record<string, unknown>).code;
+  return typeof v === "string" ? v : undefined;
+};
+
 const parseWrap = (value: string): number => {
   const n = parseInt(value, 10);
   if (Number.isNaN(n)) return DEFAULT_WRAP;
@@ -92,9 +98,7 @@ export const run = async (
   try {
     program.parse(argv, { from: "user" });
   } catch (err: unknown) {
-    if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "commander.helpDisplayed") {
-      return 0;
-    }
+    if (getErrorCode(err) === "commander.helpDisplayed") return 0;
     throw err;
   }
 
@@ -113,8 +117,8 @@ export const run = async (
     return 1;
   }
 
-  const wrap = opts.wrap as number;
-  const thought = opts.thought as boolean;
+  const wrap = typeof opts.wrap === "number" ? opts.wrap : DEFAULT_WRAP;
+  const thought = opts.thought === true;
   const lines = wrapText(message, wrap);
   const bubble = thought ? renderThoughtBubble(lines) : renderSpeechBubble(lines);
   const cow = getCow();

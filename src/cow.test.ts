@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { getCow } from "./cow";
+import { getCow, getLeadingSpaces } from "./cow";
 
 describe("getCow", () => {
   test("returns cow with baseline ASCII art", () => {
@@ -13,8 +13,8 @@ describe("getCow", () => {
     const cow = getCow();
     const lines = cow.split("\n").filter((l) => l.trim().length > 0);
     expect(lines.length).toBeGreaterThanOrEqual(2);
-    const firstLineSpaces = (lines[0]!.match(/^(\s*)/)?.[1]?.length ?? 0) as number;
-    const secondLineSpaces = (lines[1]!.match(/^(\s*)/)?.[1]?.length ?? 0) as number;
+    const firstLineSpaces = getLeadingSpaces(lines[0] ?? "");
+    const secondLineSpaces = getLeadingSpaces(lines[1] ?? "");
     expect(secondLineSpaces - firstLineSpaces).toBeLessThanOrEqual(2);
   });
 });
