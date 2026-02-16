@@ -1,19 +1,18 @@
 #!/usr/bin/env bun
 /**
- * winsay - Windows-friendly cowsay CLI
+ * winsay - CLI helper actions
  */
 
 import path from "node:path";
-import { Command } from "commander";
 import { wrapText } from "./text";
 import { renderSpeechBubble, renderThoughtBubble } from "./bubble";
 import { getCow } from "./cow";
 
-const DEFAULT_WRAP = 40;
-const MIN_WRAP = 5;
-const QUOTES_PATH = path.join(import.meta.dir, "..", "quotes.txt");
+export const DEFAULT_WRAP = 40;
+export const MIN_WRAP = 5;
+export const QUOTES_PATH = path.join(import.meta.dir, "..", "quotes.txt");
 
-const getRandomQuote = async (
+export const getRandomQuote = async (
   quotesPath: string = QUOTES_PATH,
   readFile: (p: string) => Promise<string> = (p) => Bun.file(p).text(),
 ): Promise<string> => {
@@ -51,63 +50,82 @@ export const getMessage = async (
   return await getQuote();
 };
 
-type CliIo = {
+export type CliIo = {
   log: (line: string) => void;
   error: (line: string) => void;
 };
 
-const getErrorCode = (e: unknown): string | undefined => {
+export const getErrorCode = (e: unknown): string | undefined => {
   if (e === null || typeof e !== "object" || !("code" in e)) return undefined;
   const v = (e as Record<string, unknown>).code;
   return typeof v === "string" ? v : undefined;
 };
 
-const parseWrap = (value: string): number => {
+export const parseWrap = (value: string): number => {
   const n = parseInt(value, 10);
   if (Number.isNaN(n)) return DEFAULT_WRAP;
   return Math.max(MIN_WRAP, n);
 };
 
-const createProgram = (io: CliIo): Command => {
-  const program = new Command();
-  program
-    .name("winsay")
-    .description("Windows-friendly cowsay")
-    .option("--wrap <n>", `Wrap text to n columns (default: ${DEFAULT_WRAP}, minimum: ${MIN_WRAP})`, parseWrap, DEFAULT_WRAP)
-    .option("--thought", "Render thought bubble instead of speech bubble")
-    .argument("[message...]", "Message to display; if omitted, reads from stdin or picks a random quote");
-  program.configureOutput({
-    writeOut: (str) => io.log(str),
-    writeErr: (str) => io.error(str),
-  });
-  program.exitOverride();
-  return program;
+export type ParsedOpts = {
+  wrap: number;
+  thought: boolean;
+};
+
+/**
+ * Testable entrypoint: parses argv (without Commander), then runs executeFromParsed.
+ * Commander lives in index.ts; this provides the same run(argv, ...) API for tests.
+ */
+const parseArgv = (argv: string[]): { wrap: number; thought: boolean; args: string[] } => {
+  let wrap = DEFAULT_WRAP;
+  let thought = false;
+  const args: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === undefined) continue;
+    const next = argv[i + 1];
+    if (a === "--wrap" && typeof next === "string") {
+      wrap = parseWrap(next);
+      i++;
+    } else if (a === "--thought") {
+      thought = true;
+    } else if (a !== "--help" && !a.startsWith("-")) {
+      args.push(a);
+    }
+  }
+  return { wrap, thought, args };
 };
 
 export const run = async (
   argv: string[],
   stdinReader?: () => Promise<string>,
-  io: CliIo = {
-    log: (line: string) => console.log(line),
-    error: (line: string) => console.error(line),
-  },
+  io: CliIo = { log: (l) => console.log(l), error: (l) => console.error(l) },
   quoteProvider?: () => Promise<string>,
   isTTY?: boolean,
 ): Promise<number> => {
-  const program = createProgram(io);
-  try {
-    program.parse(argv, { from: "user" });
-  } catch (err: unknown) {
-    if (getErrorCode(err) === "commander.helpDisplayed") return 0;
-    throw err;
+  if (argv.includes("--help")) {
+    io.log("Usage: winsay [options] [message...]");
+    io.log("");
+    io.log("Options:");
+    io.log(`  --wrap <n>    Wrap text to n columns (default: ${DEFAULT_WRAP}, minimum: ${MIN_WRAP})`);
+    io.log("  --thought     Render thought bubble instead of speech bubble");
+    return 0;
   }
+  const { wrap, thought, args } = parseArgv(argv);
+  return executeFromParsed({ wrap, thought }, args, io, stdinReader, quoteProvider, isTTY);
+};
 
-  const opts = program.opts();
-  const rest = program.args;
-
+export const executeFromParsed = async (
+  opts: ParsedOpts,
+  args: string[],
+  io: CliIo,
+  stdinReader?: () => Promise<string>,
+  quoteProvider?: () => Promise<string>,
+  isTTY?: boolean,
+): Promise<number> => {
   let message: string;
   try {
-    message = await getMessage(rest, stdinReader, quoteProvider, isTTY);
+    message = await getMessage(args, stdinReader, quoteProvider, isTTY);
   } catch (err) {
     io.error("winsay: " + (err instanceof Error ? err.message : "quotes file missing or empty"));
     return 1;
@@ -117,8 +135,8 @@ export const run = async (
     return 1;
   }
 
-  const wrap = typeof opts.wrap === "number" ? opts.wrap : DEFAULT_WRAP;
-  const thought = opts.thought === true;
+  const wrap = opts.wrap;
+  const thought = opts.thought;
   const lines = wrapText(message, wrap);
   const bubble = thought ? renderThoughtBubble(lines) : renderSpeechBubble(lines);
   const cow = getCow();
