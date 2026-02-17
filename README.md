@@ -39,6 +39,15 @@ bun run winsay
 # Piped empty stdin: also falls back to random quote
 ```
 
+### Random quote format and attribution
+
+When you supply no message, winsay picks a random line from `quotes.txt`. Lines can be:
+
+- **Plain text** – `The quote here`
+- **Quote with author** – `The quote here|Author Name` (pipe-separated)
+
+When a quote has an author, the attribution (e.g. `— Author Name`) appears **inside** the speech or thought bubble, as the last line before the bottom border.
+
 ### Flags
 
 | Flag | Description | Default |
