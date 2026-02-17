@@ -64,6 +64,24 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain(FIXED_QUOTE);
   });
 
+  test("random quote with attribution displays speaker", async () => {
+    const logs: string[] = [];
+    const code = await run(
+      [],
+      () => Promise.resolve(""),
+      {
+        log: (line) => logs.push(line),
+        error: () => {},
+      },
+      () => Promise.resolve({ text: "Don't Panic.", speaker: "The Hitchhiker's Guide" }),
+      false,
+    );
+    expect(code).toBe(0);
+    const output = logs.join("\n");
+    expect(output).toContain("Don't Panic.");
+    expect(output).toContain("— The Hitchhiker's Guide");
+  });
+
   test("interactive TTY with no args uses quote (skips stdin, no hang)", async () => {
     const logs: string[] = [];
     const FIXED_QUOTE = "The Answer is 42.";
