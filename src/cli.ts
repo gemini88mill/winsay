@@ -148,7 +148,10 @@ export const executeFromParsed = async (
 
   const wrap = opts.wrap;
   const thought = opts.thought;
-  const lines = wrapText(quote.text, wrap);
+  let lines = wrapText(quote.text, wrap);
+  if (quote.speaker) {
+    lines = [...lines, `— ${quote.speaker}`];
+  }
   const bubble = thought ? renderThoughtBubble(lines) : renderSpeechBubble(lines);
   const cow = getCow();
 
@@ -156,8 +159,5 @@ export const executeFromParsed = async (
     io.log(line);
   }
   io.log(cow);
-  if (quote.speaker) {
-    io.log(`— ${quote.speaker}`);
-  }
   return 0;
 };
