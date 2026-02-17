@@ -64,7 +64,7 @@ describe("cli", () => {
     expect(logs.join("\n")).toContain(FIXED_QUOTE);
   });
 
-  test("random quote with attribution displays speaker", async () => {
+  test("random quote with attribution displays speaker in bubble", async () => {
     const logs: string[] = [];
     const code = await run(
       [],
@@ -80,6 +80,10 @@ describe("cli", () => {
     const output = logs.join("\n");
     expect(output).toContain("Don't Panic.");
     expect(output).toContain("— The Hitchhiker's Guide");
+    // Speaker must be inside the bubble (before the cow), not after
+    const cowIndex = output.indexOf("\\   ^__^");
+    const speakerIndex = output.indexOf("— The Hitchhiker's Guide");
+    expect(cowIndex).toBeGreaterThan(speakerIndex);
   });
 
   test("interactive TTY with no args uses quote (skips stdin, no hang)", async () => {
