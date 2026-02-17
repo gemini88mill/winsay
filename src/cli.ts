@@ -12,10 +12,18 @@ export const DEFAULT_WRAP = 40;
 export const MIN_WRAP = 5;
 export const QUOTES_PATH = path.join(import.meta.dir, "..", "quotes.txt");
 
+export type Quote = { text: string; speaker?: string };
+
+const parseQuoteLine = (line: string): Quote => {
+  const i = line.indexOf("|");
+  if (i < 0) return { text: line };
+  return { text: line.slice(0, i).trim(), speaker: line.slice(i + 1).trim() || undefined };
+};
+
 export const getRandomQuote = async (
   quotesPath: string = QUOTES_PATH,
   readFile: (p: string) => Promise<string> = (p) => Bun.file(p).text(),
-): Promise<string> => {
+): Promise<Quote> => {
   const content = await readFile(quotesPath).catch(() => {
     throw new Error("quotes file missing or empty");
   });
@@ -24,30 +32,33 @@ export const getRandomQuote = async (
     .map((l) => l.trim())
     .filter(Boolean);
   if (lines.length === 0) throw new Error("quotes file missing or empty");
-  return lines[Math.floor(Math.random() * lines.length)]!;
+  return parseQuoteLine(lines[Math.floor(Math.random() * lines.length)]!);
 };
+
+const normalizeQuote = (q: Quote | string): Quote =>
+  typeof q === "string" ? { text: q } : q;
 
 export const getMessage = async (
   args: string[],
   stdinReader?: () => Promise<string>,
-  quoteProvider?: () => Promise<string>,
+  quoteProvider?: () => Promise<Quote | string>,
   isTTY?: boolean,
-): Promise<string> => {
+): Promise<Quote> => {
   const msg = args.join(" ").trim();
-  if (msg) return msg;
+  if (msg) return { text: msg };
 
   const tty = isTTY ?? process.stdin?.isTTY ?? false;
   if (tty) {
     const getQuote = quoteProvider ?? (() => getRandomQuote());
-    return await getQuote();
+    return normalizeQuote(await getQuote());
   }
 
   const read = stdinReader ?? (() => Bun.stdin.text());
   const stdin = await read();
-  if (stdin.trim()) return stdin.trim();
+  if (stdin.trim()) return { text: stdin.trim() };
 
   const getQuote = quoteProvider ?? (() => getRandomQuote());
-  return await getQuote();
+  return normalizeQuote(await getQuote());
 };
 
 export type CliIo = {
@@ -100,7 +111,7 @@ export const run = async (
   argv: string[],
   stdinReader?: () => Promise<string>,
   io: CliIo = { log: (l) => console.log(l), error: (l) => console.error(l) },
-  quoteProvider?: () => Promise<string>,
+  quoteProvider?: () => Promise<Quote | string>,
   isTTY?: boolean,
 ): Promise<number> => {
   if (argv.includes("--help")) {
@@ -120,24 +131,24 @@ export const executeFromParsed = async (
   args: string[],
   io: CliIo,
   stdinReader?: () => Promise<string>,
-  quoteProvider?: () => Promise<string>,
+  quoteProvider?: () => Promise<Quote | string>,
   isTTY?: boolean,
 ): Promise<number> => {
-  let message: string;
+  let quote: Quote;
   try {
-    message = await getMessage(args, stdinReader, quoteProvider, isTTY);
+    quote = await getMessage(args, stdinReader, quoteProvider, isTTY);
   } catch (err) {
     io.error("winsay: " + (err instanceof Error ? err.message : "quotes file missing or empty"));
     return 1;
   }
-  if (!message) {
+  if (!quote.text) {
     io.error("winsay: message is empty");
     return 1;
   }
 
   const wrap = opts.wrap;
   const thought = opts.thought;
-  const lines = wrapText(message, wrap);
+  const lines = wrapText(quote.text, wrap);
   const bubble = thought ? renderThoughtBubble(lines) : renderSpeechBubble(lines);
   const cow = getCow();
 
@@ -145,5 +156,8 @@ export const executeFromParsed = async (
     io.log(line);
   }
   io.log(cow);
+  if (quote.speaker) {
+    io.log(`— ${quote.speaker}`);
+  }
   return 0;
 };
